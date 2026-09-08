@@ -1,11 +1,13 @@
 use std::{ffi::c_void, ptr};
 
-use crate::{InputEvent, InputKey, InputKind, KeyboardModel, ModifierKey, Modifiers, PcEvent, PcKeyboard};
+use crate::{
+    InputEvent, InputKey, InputKind, KeyboardModel, ModifierKey, Modifiers, PcEvent, PcKeyboard,
+};
 
 pub const EVENT_MAX_BYTES: usize = 32;
+pub const EVENT_MAX_KEYS: usize = 32;
 pub const ERROR: usize = usize::MAX;
 #[derive(Clone, Copy)]
-
 #[repr(C)]
 pub struct CInputKey {
     kind: u32,
@@ -19,6 +21,12 @@ pub struct CInputEvent {
     key: CInputKey,
     modifiers: u8,
     kind: u8,
+}
+
+#[repr(C)]
+pub struct CKeyEvent {
+    key: u16,
+    down: u8,
 }
 
 fn decode_key(key: CInputKey) -> Option<InputKey> {
@@ -125,7 +133,11 @@ pub unsafe extern "C" fn pc_xt_keyboard_v1_handle(
     output: *mut u8,
     output_capacity: usize,
 ) -> usize {
-    if keyboard.is_null() || input.is_null() || output.is_null() || output_capacity < EVENT_MAX_BYTES {
+    if keyboard.is_null()
+        || input.is_null()
+        || output.is_null()
+        || output_capacity < EVENT_MAX_BYTES
+    {
         return ERROR;
     }
     let Some(input) = (unsafe { input.as_ref() }).copied().and_then(decode_event) else {
@@ -136,4 +148,72 @@ pub unsafe extern "C" fn pc_xt_keyboard_v1_handle(
     debug_assert!(bytes.len() <= EVENT_MAX_BYTES);
     unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), output, bytes.len()) };
     bytes.len()
+}
+
+/// Processes one event and writes physical key transitions into caller-owned slots.
+///
+/// Capacity is in events, not bytes, and must be at least [`EVENT_MAX_KEYS`].
+/// Invalid input, null pointers, or insufficient capacity return [`ERROR`] without
+/// changing mapper state or output. Large Command releases may need more than
+/// [`EVENT_MAX_KEYS`] slots; retry them with a larger buffer.
+///
+/// # Safety
+///
+/// `keyboard` must be a live, exclusively accessed mapper from
+/// [`pc_xt_keyboard_v1_create`]. `input` must point to a readable, aligned event.
+/// `output` must point to `output_capacity` writable, aligned event slots, not
+/// overlapping `input` or mapper state. No pointers are retained. This consumes
+/// the same mapper state as the byte API; do not submit the same input to both.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pc_xt_keyboard_v1_handle_events(
+    keyboard: *mut c_void,
+    input: *const CInputEvent,
+    output: *mut CKeyEvent,
+    output_capacity: usize,
+) -> usize {
+    if keyboard.is_null() || input.is_null() || output.is_null() || output_capacity < EVENT_MAX_KEYS
+    {
+        return ERROR;
+    }
+    let Some(input) = (unsafe { input.as_ref() }).copied().and_then(decode_event) else {
+        return ERROR;
+    };
+    let keyboard = unsafe { &mut *keyboard.cast::<PcKeyboard>() };
+
+    // Only a Command release can emit more than two bounded single-key mappings.
+    // Count final-holder releases before consuming state, without copying it.
+    if input.kind == InputKind::Release
+        && crate::is_command_key(input.key)
+        && keyboard.counts.len() > output_capacity
+    {
+        let release_count = keyboard
+            .counts
+            .iter()
+            .filter(|(id, count)| {
+                keyboard
+                    .held
+                    .values()
+                    .filter(|held| held.release_with_command)
+                    .flat_map(|held| &held.keys)
+                    .filter(|key| key.id == **id)
+                    .count()
+                    == **count
+            })
+            .count();
+        if release_count > output_capacity {
+            return ERROR;
+        }
+    }
+
+    let events = keyboard.handle(&input);
+    debug_assert!(events.len() <= output_capacity);
+    let count = events.len();
+    for (index, event) in events.into_iter().enumerate() {
+        let (key, down) = match event {
+            PcEvent::Make(key) => (key.physical, 1),
+            PcEvent::Break(key) => (key.physical, 0),
+        };
+        unsafe { output.add(index).write(CKeyEvent { key, down }) };
+    }
+    count
 }

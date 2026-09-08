@@ -147,10 +147,15 @@ impl ScanSequence {
     }
 }
 
-/// A guest PC key represented by its complete make and break sequences.
+/// A guest PC key with a physical identity and optional wire-protocol sequences.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PcKey {
     pub id: &'static str,
+    /// PC make-position identity, not a scan byte or encoded sequence.
+    ///
+    /// Ordinary keys use `0x01..=0x7f`. AT Print Screen is `0x137` and AT Pause
+    /// is `0x145`; XT Print Screen is `0x37` and XT Pause maps to Ctrl + Num Lock.
+    pub physical: u16,
     pub make: ScanSequence,
     pub break_sequence: ScanSequence,
 }
@@ -178,8 +183,8 @@ struct HeldMapping {
 
 /// Stateful, transport-neutral PC keyboard mapper.
 ///
-/// It translates [`InputEvent`] values into complete Set 1 scan sequences and
-/// reference-counts shared modifier keys.
+/// It translates [`InputEvent`] values into physical key transitions, with Set 1
+/// sequences available for wire-protocol consumers, and reference-counts shared modifiers.
 pub struct PcKeyboard {
     model: KeyboardModel,
     held: HashMap<String, HeldMapping>,
@@ -298,16 +303,19 @@ fn single(model: KeyboardModel, id: &'static str, make_code: u8) -> PcKey {
     match (model, id) {
         (KeyboardModel::AtSet1, "PRINT") => PcKey {
             id,
+            physical: 0x137,
             make: ScanSequence::four([0xE0, 0x2A, 0xE0, 0x37]),
             break_sequence: ScanSequence::four([0xE0, 0xB7, 0xE0, 0xAA]),
         },
         (KeyboardModel::AtSet1, "PAUSE") => PcKey {
             id,
+            physical: 0x145,
             make: ScanSequence::six([0xE1, 0x1D, 0x45, 0xE1, 0x9D, 0xC5]),
             break_sequence: ScanSequence::EMPTY,
         },
         _ => PcKey {
             id,
+            physical: u16::from(make_code),
             make: ScanSequence::one(make_code),
             break_sequence: ScanSequence::one(make_code | 0x80),
         },

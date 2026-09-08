@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 #define PC_XT_KEYBOARD_V1_EVENT_MAX_BYTES 32u
+#define PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS 32u
 #define PC_XT_KEYBOARD_V1_ERROR SIZE_MAX
 
 typedef enum {
@@ -78,6 +79,17 @@ typedef struct {
     uint8_t kind;
 } pc_xt_keyboard_v1_input_event;
 
+/*
+ * Physical PC key transition, not a scan-byte sequence. Ordinary make-position
+ * identities are 0x01..0x7f. AT Print Screen is 0x137 and Pause is 0x145.
+ * XT Print Screen is 0x37; XT Pause emits Ctrl (0x1d) + Num Lock (0x45).
+ * `down` is 1 for press and 0 for release, including AT Pause releases.
+ */
+typedef struct pc_xt_keyboard_v1_key_event {
+    uint16_t key;
+    uint8_t down;
+} pc_xt_keyboard_v1_key_event;
+
 /* Opaque mapper state. Destroy with pc_xt_keyboard_v1_destroy. */
 void *pc_xt_keyboard_v1_create(uint32_t model);
 void pc_xt_keyboard_v1_destroy(void *keyboard);
@@ -91,6 +103,29 @@ size_t pc_xt_keyboard_v1_handle(
     void *keyboard,
     const pc_xt_keyboard_v1_input_event *input,
     uint8_t *output,
+    size_t output_capacity
+);
+
+/*
+ * Processes one host input event into caller-owned physical key event slots.
+ * `output_capacity` counts events, not bytes, and must be at least
+ * PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS. Returns the emitted event count, or
+ * PC_XT_KEYBOARD_V1_ERROR for invalid arguments or insufficient capacity.
+ * Errors leave mapper state and output unchanged. Only returned slots are written.
+ * A bulk Command release may exceed 32 events; retry with a larger buffer
+ * (64 slots covers the current mappings). The minimum is not a bulk-release bound.
+ *
+ * `keyboard` must be a live mapper created above, exclusively borrowed during
+ * the call. `input` must be readable and `output` writable and properly aligned
+ * for their types, with no overlap with each other or mapper state. No pointer
+ * is retained and no allocation is transferred; destroy only the mapper.
+ * Call either this API or the byte API once per input, not both for the same
+ * transition: they consume the same held-key state.
+ */
+size_t pc_xt_keyboard_v1_handle_events(
+    void *keyboard,
+    const pc_xt_keyboard_v1_input_event *input,
+    pc_xt_keyboard_v1_key_event *output,
     size_t output_capacity
 );
 
