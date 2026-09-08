@@ -37,7 +37,6 @@ fn consumer_receives_physical_identity_for_both_models() {
         let mut keyboard = PcKeyboard::new(model);
         for (key, expected) in [
             (InputKey::Char('a'), vec![0x1E]),
-            (InputKey::Left, vec![0x4B]),
             (InputKey::Function(19), vec![0x37]),
             (InputKey::PrintScreen, vec![print]),
             (InputKey::Pause, pause),
@@ -126,5 +125,90 @@ fn command_release_releases_enhanced_pause_even_without_wire_break_bytes() {
             ..pause
         })),
         []
+    );
+}
+
+#[test]
+fn at_navigation_is_extended_but_xt_and_command_keypad_are_not() {
+    for (model, modifiers, extended) in [
+        (KeyboardModel::XtSet1, Modifiers::NONE, false),
+        (KeyboardModel::AtSet1, Modifiers::NONE, true),
+        (KeyboardModel::AtSet1, Modifiers::SUPER, false),
+    ] {
+        let mut keyboard = PcKeyboard::new(model);
+        for (key, position) in [
+            (InputKey::Home, 0x47),
+            (InputKey::Up, 0x48),
+            (InputKey::PageUp, 0x49),
+            (InputKey::Left, 0x4B),
+            (InputKey::Right, 0x4D),
+            (InputKey::End, 0x4F),
+            (InputKey::Down, 0x50),
+            (InputKey::PageDown, 0x51),
+            (InputKey::Insert, 0x52),
+            (InputKey::Delete, 0x53),
+        ] {
+            let identity = u16::from(position) | if extended { 0x100 } else { 0 };
+            let press = keyboard.handle(&InputEvent::new(key, modifiers, InputKind::Press));
+            let [PcEvent::Make(mapped)] = press.as_slice() else {
+                panic!("expected one navigation press");
+            };
+            assert_eq!(mapped.physical, identity);
+            let expected_make = if extended {
+                vec![0xE0, position]
+            } else {
+                vec![position]
+            };
+            assert_eq!(mapped.make.bytes(), expected_make);
+            let release =
+                keyboard.handle(&InputEvent::new(key, Modifiers::NONE, InputKind::Release));
+            let [PcEvent::Break(mapped)] = release.as_slice() else {
+                panic!("expected one navigation release");
+            };
+            assert_eq!(mapped.physical, identity);
+            let expected_break = if extended {
+                vec![0xE0, position | 0x80]
+            } else {
+                vec![position | 0x80]
+            };
+            assert_eq!(mapped.break_sequence.bytes(), expected_break);
+        }
+    }
+}
+
+#[test]
+fn enhanced_navigation_and_command_keypad_have_independent_holds() {
+    let mut keyboard = PcKeyboard::new(KeyboardModel::AtSet1);
+    assert_eq!(
+        physical(keyboard.handle(&InputEvent::new(
+            InputKey::Insert,
+            Modifiers::NONE,
+            InputKind::Press,
+        ))),
+        [(0x152, true)]
+    );
+    assert_eq!(
+        physical(keyboard.handle(&InputEvent::new(
+            InputKey::Enter,
+            Modifiers::SUPER,
+            InputKind::Press,
+        ))),
+        [(0x52, true)]
+    );
+    assert_eq!(
+        physical(keyboard.handle(&InputEvent::new(
+            InputKey::Modifier(ModifierKey::LeftSuper),
+            Modifiers::NONE,
+            InputKind::Release,
+        ))),
+        [(0x52, false)]
+    );
+    assert_eq!(
+        physical(keyboard.handle(&InputEvent::new(
+            InputKey::Insert,
+            Modifiers::NONE,
+            InputKind::Release,
+        ))),
+        [(0x152, false)]
     );
 }

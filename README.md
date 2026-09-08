@@ -99,6 +99,8 @@ For terminal applications, use ncurses for output only. Read stdin in raw mode, 
 
 Ordinary physical identities are PC make-position numbers `0x01..0x7f`, including keypad navigation and SysRq (`0x54`). AT Print Screen is `0x137`, distinct from keypad multiply (`0x37`), and AT Pause is `0x145`. XT Print Screen is `0x37`; XT Pause maps to Ctrl (`0x1d`) plus Num Lock (`0x45`). These identities are not encoded scan sequences; a controller adapter owns translation to its actual keyboard protocol.
 
+AT navigation outside the Command layer uses distinct enhanced keys: Home `0x147`, Up `0x148`, Page Up `0x149`, Left `0x14b`, Right `0x14d`, End `0x14f`, Down `0x150`, Page Down `0x151`, Insert `0x152`, and Delete `0x153`. Their wire sequences are `E0 position` on press and `E0 (position | 80)` on release, so navigation remains navigation with Num Lock enabled. XT navigation, Command-layer keypad mappings, and explicit keypad function-key mappings retain their unextended identities and bytes.
+
 For wire-protocol consumers, AT Print Screen emits `E0 2A E0 37` on press and `E0 B7 E0 AA` on release. AT Pause emits `E1 1D 45 E1 9D C5` and has no wire break sequence, but the physical API still emits its matching release. The MacBook command-layer mapping can emit AT SysRq as `54` when the caller supplies the corresponding `SUPER | CONTROL | SHIFT | ALT` event.
 
 ## Development checks

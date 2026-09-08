@@ -126,6 +126,13 @@ impl ScanSequence {
         }
     }
 
+    const fn two(bytes: [u8; 2]) -> Self {
+        Self {
+            bytes: [bytes[0], bytes[1], 0, 0, 0, 0, 0, 0],
+            len: 2,
+        }
+    }
+
     pub fn bytes(&self) -> &[u8] {
         &self.bytes[..self.len as usize]
     }
@@ -155,6 +162,8 @@ pub struct PcKey {
     ///
     /// Ordinary keys use `0x01..=0x7f`. AT Print Screen is `0x137` and AT Pause
     /// is `0x145`; XT Print Screen is `0x37` and XT Pause maps to Ctrl + Num Lock.
+    /// AT navigation keys outside the Command layer use `0x100 | make_position`
+    /// (for example Left is `0x14b`), distinct from their keypad counterparts.
     pub physical: u16,
     pub make: ScanSequence,
     pub break_sequence: ScanSequence,
@@ -331,6 +340,18 @@ pub fn map_key(input: &InputEvent, model: KeyboardModel) -> Vec<PcKey> {
     if let Some(mapping) = command_mapping(input, model) {
         return mapping;
     }
+    let navigation = |id, keypad_id, make_code| {
+        if model == KeyboardModel::AtSet1 && !command {
+            vec![PcKey {
+                id,
+                physical: 0x100 | u16::from(make_code),
+                make: ScanSequence::two([0xE0, make_code]),
+                break_sequence: ScanSequence::two([0xE0, make_code | 0x80]),
+            }]
+        } else {
+            single(keypad_id, make_code)
+        }
+    };
 
     let mut mapping = match input.key {
         Modifier(LeftShift) => single("L_SHIFT", 0x2A),
@@ -345,18 +366,18 @@ pub fn map_key(input: &InputEvent, model: KeyboardModel) -> Vec<PcKey> {
         ],
         Backspace | Char('\u{8}') if command => single("SCROLL", 0x46),
         Backspace | Char('\u{8}') => single("BACKSPACE", 0x0E),
-        Delete => single("KP_DEL", 0x53),
-        Insert => single("KP_INS", 0x52),
+        Delete => navigation("DELETE", "KP_DEL", 0x53),
+        Insert => navigation("INSERT", "KP_INS", 0x52),
         Enter | Char('\r' | '\n') if command => single("KP_INS", 0x52),
         Enter | Char('\r' | '\n') => single("ENTER", 0x1C),
-        Left => single("KP_4", 0x4B),
-        Right => single("KP_6", 0x4D),
-        Up => single("KP_8", 0x48),
-        Down => single("KP_2", 0x50),
-        Home => single("KP_7", 0x47),
-        End => single("KP_1", 0x4F),
-        PageUp => single("KP_9", 0x49),
-        PageDown => single("KP_3", 0x51),
+        Left => navigation("LEFT", "KP_4", 0x4B),
+        Right => navigation("RIGHT", "KP_6", 0x4D),
+        Up => navigation("UP", "KP_8", 0x48),
+        Down => navigation("DOWN", "KP_2", 0x50),
+        Home => navigation("HOME", "KP_7", 0x47),
+        End => navigation("END", "KP_1", 0x4F),
+        PageUp => navigation("PAGE_UP", "KP_9", 0x49),
+        PageDown => navigation("PAGE_DOWN", "KP_3", 0x51),
         PrintScreen => single("PRINT", 0x37),
         Pause if model == KeyboardModel::AtSet1 => single("PAUSE", 0),
         Pause => vec![

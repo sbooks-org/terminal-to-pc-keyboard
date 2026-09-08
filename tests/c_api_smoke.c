@@ -12,6 +12,27 @@ static size_t handle(void *keyboard, pc_xt_keyboard_v1_input_event input, uint8_
     );
 }
 
+static void navigation_wire_sequences(void) {
+    void *keyboard = pc_xt_keyboard_v1_create(PC_XT_KEYBOARD_V1_AT_SET1);
+    uint8_t output[PC_XT_KEYBOARD_V1_EVENT_MAX_BYTES];
+    pc_xt_keyboard_v1_input_event left = {
+        .key = { .kind = PC_XT_KEYBOARD_V1_KEY_LEFT },
+        .kind = PC_XT_KEYBOARD_V1_PRESS,
+    };
+    assert(keyboard != NULL);
+    assert(handle(keyboard, left, output) == 2);
+    assert(output[0] == 0xE0 && output[1] == 0x4B);
+    left.kind = PC_XT_KEYBOARD_V1_RELEASE;
+    assert(handle(keyboard, left, output) == 2);
+    assert(output[0] == 0xE0 && output[1] == 0xCB);
+    left.kind = PC_XT_KEYBOARD_V1_PRESS;
+    left.modifiers = PC_XT_KEYBOARD_V1_MOD_SUPER;
+    assert(handle(keyboard, left, output) == 1 && output[0] == 0x4B);
+    left.kind = PC_XT_KEYBOARD_V1_RELEASE;
+    assert(handle(keyboard, left, output) == 1 && output[0] == 0xCB);
+    pc_xt_keyboard_v1_destroy(keyboard);
+}
+
 static size_t handle_events(void *keyboard, pc_xt_keyboard_v1_input_event input,
                             pc_xt_keyboard_v1_key_event output[PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS]) {
     return pc_xt_keyboard_v1_handle_events(
@@ -29,7 +50,8 @@ static void physical_models(void) {
             size_t count;
         } cases[] = {
             { { .kind = PC_XT_KEYBOARD_V1_KEY_CHAR, .character = 'a' }, { 0x1E }, 1 },
-            { { .kind = PC_XT_KEYBOARD_V1_KEY_LEFT }, { 0x4B }, 1 },
+            { { .kind = PC_XT_KEYBOARD_V1_KEY_LEFT },
+              { model == PC_XT_KEYBOARD_V1_AT_SET1 ? 0x14B : 0x4B }, 1 },
             { { .kind = PC_XT_KEYBOARD_V1_KEY_FUNCTION, .value = 19 }, { 0x37 }, 1 },
             { { .kind = PC_XT_KEYBOARD_V1_KEY_PRINT_SCREEN },
               { model == PC_XT_KEYBOARD_V1_AT_SET1 ? 0x137 : 0x37 }, 1 },
@@ -183,6 +205,7 @@ static void bulk_release_capacity_retry(void) {
 }
 
 int main(void) {
+    navigation_wire_sequences();
     physical_models();
     shared_modifiers_and_errors();
     bulk_release_capacity_retry();
