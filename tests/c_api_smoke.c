@@ -166,7 +166,9 @@ static void bulk_release_capacity_retry(void) {
         output[i].key = 0xFFFF;
         output[i].down = 0xFF;
     }
-    assert(handle_events(keyboard, release, output) == PC_XT_KEYBOARD_V1_ERROR);
+    assert(pc_xt_keyboard_v1_handle_events(
+        keyboard, &release, output, 32
+    ) == PC_XT_KEYBOARD_V1_ERROR);
     for (size_t i = 0; i < 64; ++i) {
         assert(output[i].key == 0xFFFF && output[i].down == 0xFF);
     }

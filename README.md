@@ -52,7 +52,7 @@ if (count != PC_XT_KEYBOARD_V1_ERROR) {
 pc_xt_keyboard_v1_destroy(keyboard);
 ```
 
-`pc_xt_keyboard_v1_handle_events` measures capacity in event slots, not bytes, and requires at least `PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS` (32) slots. It returns the emitted event count, or `PC_XT_KEYBOARD_V1_ERROR` for invalid input, null pointers, or insufficient capacity. Error returns leave mapper state and output unchanged, so the input can be retried. A Command release can release more than 32 held keys at once; despite the constant's name, it is the minimum buffer capacity, not a bound on bulk releases. Use a larger buffer (64 slots covers the current mappings) for that case.
+`pc_xt_keyboard_v1_handle_events` measures capacity in event slots, not bytes, and requires at least `PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS` (64) slots. This conservatively bounds every current mapping: a bulk Command release emits at most 37 transitions, and other inputs emit at most eight. It returns the emitted event count, or `PC_XT_KEYBOARD_V1_ERROR` for invalid input, null pointers, or insufficient capacity. Error returns leave mapper state and output unchanged, so the input can be retried. Bulk releases are also checked against the actual caller capacity before mutation, guarding against overflow if future mappings expand.
 
 The caller owns both input and output memory; the mapper retains neither pointer. Pass properly aligned, readable input and writable output slots that do not overlap each other or mapper state. Only the returned slots are written. Serialize access to each mapper and destroy it with `pc_xt_keyboard_v1_destroy`; no output allocation needs freeing.
 

@@ -5,7 +5,7 @@ use crate::{
 };
 
 pub const EVENT_MAX_BYTES: usize = 32;
-pub const EVENT_MAX_KEYS: usize = 32;
+pub const EVENT_MAX_KEYS: usize = 64;
 pub const ERROR: usize = usize::MAX;
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -154,8 +154,8 @@ pub unsafe extern "C" fn pc_xt_keyboard_v1_handle(
 ///
 /// Capacity is in events, not bytes, and must be at least [`EVENT_MAX_KEYS`].
 /// Invalid input, null pointers, or insufficient capacity return [`ERROR`] without
-/// changing mapper state or output. Large Command releases may need more than
-/// [`EVENT_MAX_KEYS`] slots; retry them with a larger buffer.
+/// changing mapper state or output. [`EVENT_MAX_KEYS`] conservatively covers all
+/// current mappings, including bulk Command releases (at most 37 transitions).
 ///
 /// # Safety
 ///

@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 #define PC_XT_KEYBOARD_V1_EVENT_MAX_BYTES 32u
-#define PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS 32u
+#define PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS 64u
 #define PC_XT_KEYBOARD_V1_ERROR SIZE_MAX
 
 typedef enum {
@@ -112,8 +112,8 @@ size_t pc_xt_keyboard_v1_handle(
  * PC_XT_KEYBOARD_V1_EVENT_MAX_KEYS. Returns the emitted event count, or
  * PC_XT_KEYBOARD_V1_ERROR for invalid arguments or insufficient capacity.
  * Errors leave mapper state and output unchanged. Only returned slots are written.
- * A bulk Command release may exceed 32 events; retry with a larger buffer
- * (64 slots covers the current mappings). The minimum is not a bulk-release bound.
+ * The 64-event minimum conservatively bounds every current mapping, including
+ * bulk Command releases (at most 37 transitions).
  *
  * `keyboard` must be a live mapper created above, exclusively borrowed during
  * the call. `input` must be readable and `output` writable and properly aligned
