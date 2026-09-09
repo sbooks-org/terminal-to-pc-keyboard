@@ -5,7 +5,7 @@ edition = "2024"
 autobins = false
 description = "Transport-neutral IBM PC/XT and PC/AT Set 1 keyboard mapper"
 license = "MIT-0"
-repository = "https://github.com/sbooks-org/terminal-to-pc-keyboard"
+repository = "ssh://git@github.com/sbooks-org/terminal-to-pc-keyboard.git"
 
 [lib]
 crate-type = ["rlib", "staticlib", "cdylib"]
