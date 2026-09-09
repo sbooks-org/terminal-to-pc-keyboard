@@ -578,6 +578,7 @@ fn map_char(character: char, command: bool, model: KeyboardModel) -> Vec<PcKey> 
     }
 
     let (id, make_code) = match character {
+        '\t' => ("TAB", 0x0F),
         'a' => ("A", 0x1E),
         'b' => ("B", 0x30),
         'c' => ("C", 0x2E),

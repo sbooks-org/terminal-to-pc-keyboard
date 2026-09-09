@@ -37,6 +37,7 @@ fn consumer_receives_physical_identity_for_both_models() {
         let mut keyboard = PcKeyboard::new(model);
         for (key, expected) in [
             (InputKey::Char('a'), vec![0x1E]),
+            (InputKey::Char('\t'), vec![0x0F]),
             (InputKey::Function(19), vec![0x37]),
             (InputKey::PrintScreen, vec![print]),
             (InputKey::Pause, pause),
