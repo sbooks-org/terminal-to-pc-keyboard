@@ -1,4 +1,11 @@
 # terminal-to-pc-keyboard
+v0.1.0. 
+Last updated 11 September 2026
+
+## License
+
+[MIT-0](LICENSE). 
+Copyright (C) 2026 Simplebooks Foundation
 
 Transport-neutral host-keyboard mapper for IBM PC/XT and PC/AT keyboards. It accepts normalized host press, repeat, and release events and emits physical guest key transitions. Set 1 scan-byte output remains available for consumers that implement the keyboard wire protocol.
 
@@ -120,6 +127,3 @@ cc -std=c11 -Wall -Wextra -Werror -Iinclude tests/c_api_smoke.c \
 target/c_api_smoke
 ```
 
-## License
-
-[MIT-0](LICENSE). Copyright (C) 2026 Simplebooks Foundation and Copyright (C) 2026 Josh Rodd.
